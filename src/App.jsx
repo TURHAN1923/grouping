@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { gruplarOlustur } from "./groq";
 import "./index.css";
 
@@ -53,7 +53,8 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem("gecmis")) || []; } catch { return []; }
   });
   const [seciliGecmis, setSeciliGecmis] = useState(null);
-  const fotoRef = useRef();
+  const [duzenleId, setDuzenleId] = useState(null);
+  const [duzenleData, setDuzenleData] = useState({});
 
   useEffect(() => { localStorage.setItem("kisiler", JSON.stringify(kisiler)); }, [kisiler]);
   useEffect(() => { localStorage.setItem("gorevler", JSON.stringify(gorevler)); }, [gorevler]);
@@ -80,6 +81,12 @@ export default function App() {
     });
   }
 
+  function kisiKaydet() {
+    setKisiler(kisiler.map(k => k.id === duzenleId ? { ...k, ...duzenleData } : k));
+    setDuzenleId(null);
+    setDuzenleData({});
+  }
+
   function gorevEkle() {
     if (!yeniGorev.baslik.trim()) return;
     setGorevler([...gorevler, { ...yeniGorev, id: Date.now() }]);
@@ -103,7 +110,6 @@ export default function App() {
         gorev: karisikGorevler[i % karisikGorevler.length] || null,
       }));
       setGruplar(gruplarlaGorev);
-
       const yeniKayit = {
         id: Date.now(),
         tarih: new Date().toLocaleString("tr-TR"),
@@ -122,50 +128,37 @@ export default function App() {
 
   const aktifSayisi = kisiler.filter(k => !k.izinli).length;
   const izinliSayisi = kisiler.filter(k => k.izinli).length;
-
   const gosterilecekGruplar = seciliGecmis ? seciliGecmis.gruplar : gruplar;
   const gosterilecekKisiler = seciliGecmis ? seciliGecmis.kisiler : kisiler;
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0f", display: "flex", flexDirection: "column" }}>
 
-      {/* HEADER */}
       <div style={{ background: "#111118", borderBottom: "3px solid #00ff88", padding: "16px 20px", textAlign: "center" }}>
         <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "18px", color: "#00ff88", letterSpacing: "2px" }}>
-          ⚔️ EKİP DAĞITIM
+          ⚔️ MEVAT-T
         </div>
         <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#555", marginTop: "4px" }}>powered by AI</div>
       </div>
 
       <div style={{ display: "flex", flex: 1 }}>
 
-        {/* SOL PANEL — GEÇMİŞ */}
+        {/* SOL PANEL */}
         <div style={{ width: "220px", background: "#0d0d14", borderRight: "1px solid #1a1a2a", padding: "16px 12px", flexShrink: 0 }}>
-          <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#00ff88", marginBottom: "12px", letterSpacing: "1px" }}>
-            📁 GEÇMİŞ
-          </div>
+          <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#00ff88", marginBottom: "12px", letterSpacing: "1px" }}>📁 GEÇMİŞ</div>
           {gecmis.length === 0 && (
-            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#333", lineHeight: "1.6" }}>
-              Henüz gruplama yapılmadı.
-            </div>
+            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#333", lineHeight: "1.6" }}>Henüz gruplama yapılmadı.</div>
           )}
           {gecmis.map((g, i) => (
             <div key={g.id} onClick={() => { setSeciliGecmis(g); setSekme("sonuc"); }}
               style={{
                 background: seciliGecmis?.id === g.id ? "#1a1a2a" : "transparent",
                 border: `1px solid ${seciliGecmis?.id === g.id ? "#00ff8844" : "#1a1a2a"}`,
-                borderRadius: "6px", padding: "8px 10px", marginBottom: "6px",
-                cursor: "pointer", transition: "all 0.2s",
+                borderRadius: "6px", padding: "8px 10px", marginBottom: "6px", cursor: "pointer",
               }}>
-              <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#00ff88", fontWeight: "bold" }}>
-                #{gecmis.length - i} — {g.grupSayisi} grup
-              </div>
-              <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#444", marginTop: "3px" }}>
-                {g.aktifSayisi} kişi
-              </div>
-              <div style={{ fontFamily: "monospace", fontSize: "9px", color: "#333", marginTop: "2px" }}>
-                {g.tarih}
-              </div>
+              <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#00ff88", fontWeight: "bold" }}>#{gecmis.length - i} — {g.grupSayisi} grup</div>
+              <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#444", marginTop: "3px" }}>{g.aktifSayisi} kişi</div>
+              <div style={{ fontFamily: "monospace", fontSize: "9px", color: "#333", marginTop: "2px" }}>{g.tarih}</div>
             </div>
           ))}
           {gecmis.length > 0 && (
@@ -178,8 +171,6 @@ export default function App() {
 
         {/* SAĞ İÇERİK */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-
-          {/* SEKMELER */}
           <div style={{ display: "flex", borderBottom: "2px solid #222", background: "#111118" }}>
             {[
               { key: "liste", label: "👥 Ekip" },
@@ -200,7 +191,7 @@ export default function App() {
 
           <div style={{ padding: "24px 20px", maxWidth: "860px", width: "100%" }}>
 
-            {/* SEKME: EKİP LİSTESİ */}
+            {/* EKİP LİSTESİ */}
             {sekme === "liste" && (
               <div>
                 <div style={{ display: "flex", gap: "12px", marginBottom: "24px" }}>
@@ -209,34 +200,20 @@ export default function App() {
                     { label: "Aktif", val: aktifSayisi, renk: "#00aaff" },
                     { label: "İzinli", val: izinliSayisi, renk: "#ff6644" },
                   ].map(s => (
-                    <div key={s.label} style={{
-                      flex: 1, background: "#111118", border: `1px solid ${s.renk}33`,
-                      borderRadius: "8px", padding: "14px", textAlign: "center"
-                    }}>
+                    <div key={s.label} style={{ flex: 1, background: "#111118", border: `1px solid ${s.renk}33`, borderRadius: "8px", padding: "14px", textAlign: "center" }}>
                       <div style={{ fontSize: "28px", fontWeight: "bold", color: s.renk, fontFamily: "monospace" }}>{s.val}</div>
                       <div style={{ fontSize: "11px", color: "#555", marginTop: "4px", fontFamily: "monospace" }}>{s.label}</div>
                     </div>
                   ))}
                 </div>
 
-                {/* Yeni kişi formu */}
+                {/* YENİ KİŞİ FORMU */}
                 <div style={{ background: "#111118", border: "1px solid #222", borderRadius: "10px", padding: "16px", marginBottom: "20px" }}>
                   <div style={{ fontFamily: "monospace", fontSize: "12px", color: "#00ff88", marginBottom: "12px" }}>+ YENİ KİŞİ EKLE</div>
-
-                  {/* Fotoğraf alanı */}
                   <div style={{ display: "flex", gap: "16px", marginBottom: "12px", alignItems: "center" }}>
                     <div onClick={() => document.getElementById("yeni-foto").click()}
-                      style={{
-                        width: "64px", height: "64px", borderRadius: "8px",
-                        border: "2px dashed #333", cursor: "pointer",
-                        overflow: "hidden", flexShrink: 0, display: "flex",
-                        alignItems: "center", justifyContent: "center",
-                        background: "#0a0a0f",
-                      }}>
-                      {yeniKisi.foto
-                        ? <img src={yeniKisi.foto} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        : <span style={{ fontSize: "24px" }}>📷</span>
-                      }
+                      style={{ width: "64px", height: "64px", borderRadius: "8px", border: "2px dashed #333", cursor: "pointer", overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#0a0a0f" }}>
+                      {yeniKisi.foto ? <img src={yeniKisi.foto} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "24px" }}>📷</span>}
                     </div>
                     <input id="yeni-foto" type="file" accept="image/*" style={{ display: "none" }}
                       onChange={e => e.target.files[0] && yeniFotoEkle(e.target.files[0])} />
@@ -244,12 +221,10 @@ export default function App() {
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
                         <input placeholder="İsim Soyisim" value={yeniKisi.isim}
                           onChange={e => setYeniKisi({ ...yeniKisi, isim: e.target.value })}
-                          onKeyDown={e => e.key === "Enter" && kisiEkle()}
-                          style={inputStyle} />
+                          onKeyDown={e => e.key === "Enter" && kisiEkle()} style={inputStyle} />
                         <input placeholder="Ekip / Birim" value={yeniKisi.ekip}
                           onChange={e => setYeniKisi({ ...yeniKisi, ekip: e.target.value })}
-                          onKeyDown={e => e.key === "Enter" && kisiEkle()}
-                          style={inputStyle} />
+                          onKeyDown={e => e.key === "Enter" && kisiEkle()} style={inputStyle} />
                       </div>
                       <input placeholder="Önceki projeler (virgülle ayır)" value={yeniKisi.projeler}
                         onChange={e => setYeniKisi({ ...yeniKisi, projeler: e.target.value })}
@@ -257,66 +232,89 @@ export default function App() {
                         style={{ ...inputStyle, width: "100%" }} />
                     </div>
                   </div>
-
                   <div style={{ display: "flex", alignItems: "center", gap: "16px", marginTop: "10px" }}>
                     <label style={{ display: "flex", alignItems: "center", gap: "6px", fontFamily: "monospace", fontSize: "12px", color: "#aaa", cursor: "pointer" }}>
-                      <input type="checkbox" checked={yeniKisi.izinli}
-                        onChange={e => setYeniKisi({ ...yeniKisi, izinli: e.target.checked })} />
+                      <input type="checkbox" checked={yeniKisi.izinli} onChange={e => setYeniKisi({ ...yeniKisi, izinli: e.target.checked })} />
                       İzinli
                     </label>
                     <button onClick={kisiEkle} style={btnStyle("#00ff88")}>EKLE</button>
                   </div>
                 </div>
 
-                {/* Kişi listesi */}
+                {/* KİŞİ LİSTESİ */}
                 {kisiler.length === 0 && (
-                  <div style={{ textAlign: "center", color: "#333", fontFamily: "monospace", padding: "40px" }}>
-                    Henüz kimse yok. Ekip üyesi ekle!
-                  </div>
+                  <div style={{ textAlign: "center", color: "#333", fontFamily: "monospace", padding: "40px" }}>Henüz kimse yok. Ekip üyesi ekle!</div>
                 )}
                 {kisiler.map((k, i) => (
                   <div key={k.id} style={{
-                    display: "flex", alignItems: "center", gap: "12px",
-                    background: "#111118", border: `1px solid ${k.izinli ? "#ff664433" : "#222"}`,
+                    background: "#111118",
+                    border: `1px solid ${duzenleId === k.id ? "#00ff8844" : k.izinli ? "#ff664433" : "#222"}`,
                     borderRadius: "8px", padding: "10px 14px", marginBottom: "8px",
-                    opacity: k.izinli ? 0.6 : 1,
+                    opacity: k.izinli && duzenleId !== k.id ? 0.6 : 1,
                   }}>
-                    {/* Fotoğraf */}
-                    <div onClick={() => document.getElementById(`foto-${k.id}`).click()}
-                      style={{
-                        width: "48px", height: "48px", borderRadius: "8px",
-                        border: "2px dashed #333", cursor: "pointer",
-                        overflow: "hidden", flexShrink: 0, display: "flex",
-                        alignItems: "center", justifyContent: "center",
-                        background: "#0a0a0f",
-                      }}>
-                      {k.foto
-                        ? <img src={k.foto} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        : <span style={{ fontSize: "20px" }}>📷</span>
-                      }
-                    </div>
-                    <input id={`foto-${k.id}`} type="file" accept="image/*" style={{ display: "none" }}
-                      onChange={e => e.target.files[0] && fotoEkle(k.id, e.target.files[0])} />
-
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontFamily: "monospace", fontSize: "13px", fontWeight: "bold", color: k.izinli ? "#555" : "#e0e0e0" }}>
-                        {k.isim}
-                        {k.izinli && <span style={{ marginLeft: "8px", fontSize: "10px", color: "#ff6644", background: "#ff664422", padding: "2px 6px", borderRadius: "4px" }}>İZİNLİ</span>}
+                    {duzenleId === k.id ? (
+                      // DÜZENLEME MODU
+                      <div>
+                        <div style={{ display: "flex", gap: "16px", marginBottom: "10px", alignItems: "center" }}>
+                          <div onClick={() => document.getElementById(`duzenle-foto-${k.id}`).click()}
+                            style={{ width: "48px", height: "48px", borderRadius: "8px", border: "2px dashed #00ff88", cursor: "pointer", overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#0a0a0f" }}>
+                            {duzenleData.foto ? <img src={duzenleData.foto} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "20px" }}>📷</span>}
+                          </div>
+                          <input id={`duzenle-foto-${k.id}`} type="file" accept="image/*" style={{ display: "none" }}
+                            onChange={e => e.target.files[0] && resimSikistir(e.target.files[0], (b) => setDuzenleData({ ...duzenleData, foto: b }))} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                              <input value={duzenleData.isim || ""} placeholder="İsim Soyisim"
+                                onChange={e => setDuzenleData({ ...duzenleData, isim: e.target.value })} style={inputStyle} />
+                              <input value={duzenleData.ekip || ""} placeholder="Ekip / Birim"
+                                onChange={e => setDuzenleData({ ...duzenleData, ekip: e.target.value })} style={inputStyle} />
+                            </div>
+                            <input value={duzenleData.projeler || ""} placeholder="Önceki projeler"
+                              onChange={e => setDuzenleData({ ...duzenleData, projeler: e.target.value })}
+                              style={{ ...inputStyle, width: "100%" }} />
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <label style={{ display: "flex", alignItems: "center", gap: "6px", fontFamily: "monospace", fontSize: "12px", color: "#aaa", cursor: "pointer" }}>
+                            <input type="checkbox" checked={duzenleData.izinli || false}
+                              onChange={e => setDuzenleData({ ...duzenleData, izinli: e.target.checked })} />
+                            İzinli
+                          </label>
+                          <button onClick={kisiKaydet} style={btnStyle("#00ff88", "8px 14px")}>✓ Kaydet</button>
+                          <button onClick={() => { setDuzenleId(null); setDuzenleData({}); }} style={btnStyle("#555", "8px 14px")}>✕ İptal</button>
+                        </div>
                       </div>
-                      <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#555", marginTop: "2px" }}>
-                        {k.ekip} {k.projeler && `• ${k.projeler}`}
+                    ) : (
+                      // NORMAL GÖRÜNÜM
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div onClick={() => document.getElementById(`foto-${k.id}`).click()}
+                          style={{ width: "48px", height: "48px", borderRadius: "8px", border: "2px dashed #333", cursor: "pointer", overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#0a0a0f" }}>
+                          {k.foto ? <img src={k.foto} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "20px" }}>📷</span>}
+                        </div>
+                        <input id={`foto-${k.id}`} type="file" accept="image/*" style={{ display: "none" }}
+                          onChange={e => e.target.files[0] && fotoEkle(k.id, e.target.files[0])} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontFamily: "monospace", fontSize: "13px", fontWeight: "bold", color: k.izinli ? "#555" : "#e0e0e0" }}>
+                            {k.isim}
+                            {k.izinli && <span style={{ marginLeft: "8px", fontSize: "10px", color: "#ff6644", background: "#ff664422", padding: "2px 6px", borderRadius: "4px" }}>İZİNLİ</span>}
+                          </div>
+                          <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#555", marginTop: "2px" }}>
+                            {k.ekip} {k.projeler && `• ${k.projeler}`}
+                          </div>
+                        </div>
+                        <button onClick={() => { setDuzenleId(k.id); setDuzenleData({ ...k }); }} style={btnStyle("#ffcc00", "8px 10px")}>✏️</button>
+                        <button onClick={() => izinToggle(k.id)} style={btnStyle(k.izinli ? "#ff6644" : "#444", "8px 10px")}>
+                          {k.izinli ? "✓ İzinli" : "İzin"}
+                        </button>
+                        <button onClick={() => kisiSil(k.id)} style={btnStyle("#ff3333", "8px 10px")}>✕</button>
                       </div>
-                    </div>
-                    <button onClick={() => izinToggle(k.id)} style={btnStyle(k.izinli ? "#ff6644" : "#444", "8px 10px")}>
-                      {k.izinli ? "✓ İzinli" : "İzin"}
-                    </button>
-                    <button onClick={() => kisiSil(k.id)} style={btnStyle("#ff3333", "8px 10px")}>✕</button>
+                    )}
                   </div>
                 ))}
               </div>
             )}
 
-            {/* SEKME: GÖREVLER */}
+            {/* GÖREVLER */}
             {sekme === "gorevler" && (
               <div>
                 <div style={{ background: "#111118", border: "1px solid #222", borderRadius: "10px", padding: "16px", marginBottom: "20px" }}>
@@ -332,17 +330,10 @@ export default function App() {
                   <button onClick={gorevEkle} style={btnStyle("#00ff88")}>EKLE</button>
                 </div>
                 {gorevler.length === 0 && (
-                  <div style={{ textAlign: "center", color: "#333", fontFamily: "monospace", padding: "40px" }}>
-                    Henüz görev yok. Görev havuzunu doldur!
-                  </div>
+                  <div style={{ textAlign: "center", color: "#333", fontFamily: "monospace", padding: "40px" }}>Henüz görev yok.</div>
                 )}
                 {gorevler.map((g, i) => (
-                  <div key={g.id} style={{
-                    background: "#111118", border: `1px solid ${RENKLER[i % RENKLER.length]}44`,
-                    borderLeft: `3px solid ${RENKLER[i % RENKLER.length]}`,
-                    borderRadius: "8px", padding: "12px 16px",
-                    display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px",
-                  }}>
+                  <div key={g.id} style={{ background: "#111118", border: `1px solid ${RENKLER[i % RENKLER.length]}44`, borderLeft: `3px solid ${RENKLER[i % RENKLER.length]}`, borderRadius: "8px", padding: "12px 16px", display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontFamily: "monospace", fontSize: "13px", fontWeight: "bold", color: "#e0e0e0" }}>🎯 {g.baslik}</div>
                       {g.aciklama && <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#555", marginTop: "4px" }}>{g.aciklama}</div>}
@@ -353,12 +344,10 @@ export default function App() {
               </div>
             )}
 
-            {/* SEKME: DAĞITIM */}
+            {/* DAĞITIM */}
             {sekme === "dagit" && (
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "14px", color: "#00ff88", marginBottom: "32px" }}>
-                  AI GRUPLAMA
-                </div>
+                <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "14px", color: "#00ff88", marginBottom: "32px" }}>AI GRUPLAMA</div>
                 <div style={{ background: "#111118", border: "1px solid #222", borderRadius: "10px", padding: "32px", marginBottom: "24px" }}>
                   <div style={{ fontFamily: "monospace", fontSize: "13px", color: "#aaa", marginBottom: "8px" }}>
                     Aktif: <span style={{ color: "#00ff88" }}>{aktifSayisi}</span> &nbsp;|&nbsp;
@@ -388,36 +377,24 @@ export default function App() {
               </div>
             )}
 
-            {/* SEKME: SONUÇ */}
+            {/* SONUÇ */}
             {sekme === "sonuc" && (
               <div>
                 {seciliGecmis && (
                   <div style={{ background: "#1a1a2a", border: "1px solid #00ff8833", borderRadius: "8px", padding: "10px 16px", marginBottom: "16px", fontFamily: "monospace", fontSize: "12px", color: "#00ff88" }}>
-                    📁 Geçmiş kayıt görüntüleniyor — {seciliGecmis.tarih}
+                    📁 Geçmiş kayıt — {seciliGecmis.tarih}
                     <button onClick={() => setSeciliGecmis(null)} style={{ ...btnStyle("#555", "4px 10px"), marginLeft: "12px", fontSize: "11px" }}>✕ Kapat</button>
                   </div>
                 )}
                 {gosterilecekGruplar.length === 0 ? (
-                  <div style={{ textAlign: "center", color: "#333", fontFamily: "monospace", padding: "40px" }}>
-                    Henüz gruplar oluşturulmadı.
-                  </div>
+                  <div style={{ textAlign: "center", color: "#333", fontFamily: "monospace", padding: "40px" }}>Henüz gruplar oluşturulmadı.</div>
                 ) : (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
                     {gosterilecekGruplar.map((g, i) => (
-                      <div key={i} style={{
-                        background: "#111118",
-                        border: `1px solid ${RENKLER[i % RENKLER.length]}44`,
-                        borderTop: `3px solid ${RENKLER[i % RENKLER.length]}`,
-                        borderRadius: "10px", padding: "16px",
-                      }}>
-                        <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "11px", color: RENKLER[i % RENKLER.length], marginBottom: "12px" }}>
-                          GRUP {g.no}
-                        </div>
+                      <div key={i} style={{ background: "#111118", border: `1px solid ${RENKLER[i % RENKLER.length]}44`, borderTop: `3px solid ${RENKLER[i % RENKLER.length]}`, borderRadius: "10px", padding: "16px" }}>
+                        <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "11px", color: RENKLER[i % RENKLER.length], marginBottom: "12px" }}>GRUP {g.no}</div>
                         {g.gorev && (
-                          <div style={{
-                            background: "#0a0a0f", border: `1px solid ${RENKLER[i % RENKLER.length]}55`,
-                            borderRadius: "6px", padding: "10px", marginBottom: "12px",
-                          }}>
+                          <div style={{ background: "#0a0a0f", border: `1px solid ${RENKLER[i % RENKLER.length]}55`, borderRadius: "6px", padding: "10px", marginBottom: "12px" }}>
                             <div style={{ fontFamily: "monospace", fontSize: "10px", color: RENKLER[i % RENKLER.length], marginBottom: "4px" }}>🎯 GÖREV</div>
                             <div style={{ fontFamily: "monospace", fontSize: "12px", color: "#e0e0e0", fontWeight: "bold" }}>{g.gorev.baslik}</div>
                             {g.gorev.aciklama && <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#555", marginTop: "4px" }}>{g.gorev.aciklama}</div>}
@@ -427,16 +404,8 @@ export default function App() {
                           const kisi = gosterilecekKisiler.find(k => k.isim === u);
                           return (
                             <div key={j} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                              <div style={{
-                                width: "40px", height: "40px", borderRadius: "8px",
-                                overflow: "hidden", flexShrink: 0, background: "#0a0a0f",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                border: `1px solid ${RENKLER[i % RENKLER.length]}33`,
-                              }}>
-                                {kisi?.foto
-                                  ? <img src={kisi.foto} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                  : <span style={{ fontSize: "18px" }}>👤</span>
-                                }
+                              <div style={{ width: "40px", height: "40px", borderRadius: "8px", overflow: "hidden", flexShrink: 0, background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${RENKLER[i % RENKLER.length]}33` }}>
+                                {kisi?.foto ? <img src={kisi.foto} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "18px" }}>👤</span>}
                               </div>
                               <div>
                                 <div style={{ fontFamily: "monospace", fontSize: "13px", fontWeight: "bold", color: "#e0e0e0" }}>{u}</div>
