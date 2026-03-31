@@ -42,7 +42,7 @@ export default function Login({ onGiris }) {
       }}>
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
           <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "16px", color: "#00ff88", marginBottom: "8px" }}>
-            ⚔️ EKİP DAĞITIM
+            ⚔️  MEVAT-T
           </div>
           <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#555" }}>
             Giriş yapın
