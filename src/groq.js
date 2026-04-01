@@ -3,7 +3,9 @@ import axios from "axios";
 const OPENROUTER_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 
 export async function gruplarOlustur(kisiler, grupSayisi) {
-  const aktifKisiler = kisiler.filter(k => !k.izinli);
+ const aktifKisiler = kisiler
+  .filter(k => !k.izinli)
+  .sort(() => Math.random() - 0.5);
 
   const prompt = `
 Sen bir ekip yöneticisisin. Aşağıdaki kişileri ${grupSayisi} gruba böl.
