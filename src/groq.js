@@ -7,20 +7,20 @@ export async function gruplarOlustur(kisiler, grupSayisi) {
     .filter(k => !k.izinli)
     .sort(() => Math.random() - 0.5);
 
-  const prompt = `Aşağıdaki ${aktifKisiler.length} kişiyi ${grupSayisi} gruba böl. Aynı birimden kişiler farklı gruplara gitsin. Gruplar eşit sayıda olsun.
+  const prompt = `${aktifKisiler.length} kişiyi ${grupSayisi} gruba böl. Aynı birimden kişiler farklı gruplara gitsin.
 
-Ekip:
-${aktifKisiler.map(k => `${k.isim}${k.ekip ? ` (${k.ekip})` : ""}`).join("\n")}
+Kişiler:
+${aktifKisiler.map((k, i) => `${i + 1}. ${k.isim}${k.ekip ? ` [${k.ekip}]` : ""}`).join("\n")}
 
-SADECE bu JSON formatında yanıt ver, başka hiçbir şey yazma:
-{"gruplar":[{"no":1,"uyeler":["isim1","isim2"],"gerekce":"açıklama"}]}`;
+Yanıt formatı (SADECE bu JSON, başka hiçbir şey yazma):
+{"gruplar":[{"no":1,"uyeler":["Tam Isim 1","Tam Isim 2"],"gerekce":"1-2 cümle kısa açıklama"}]}`;
 
   const res = await axios.post(
     "https://api.groq.com/openai/v1/chat/completions",
     {
       model: "llama-3.3-70b-versatile",
       messages: [
-        { role: "system", content: "Sen bir JSON üreticisin. Sadece geçerli JSON döndür, başka hiçbir şey yazma." },
+        { role: "system", content: "Sadece geçerli JSON döndür. Başka hiçbir şey yazma. gerekce alanına kişi ismi yazma, sadece gruplama mantığını açıkla." },
         { role: "user", content: prompt }
       ],
       temperature: 0.3,
