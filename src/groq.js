@@ -7,11 +7,12 @@ export async function gruplarOlustur(kisiler, grupSayisi) {
 
   const prompt = `
 Sen bir ekip yöneticisisin. Aşağıdaki kişileri ${grupSayisi} gruba böl.
-Ekip dengesini, önceki projeleri ve uzmanlıkları göz önünde bulundur.
-Aynı ekipten çok kişi aynı gruba düşmesin.
+Ekip dengesini ve uzmanlıkları göz önünde bulundur.
+Aynı birimden çok kişi aynı gruba düşmesin.
+Gruplama gerekçesi yazarken sadece gerçek bilgilere dayan, unvan veya proje bilgisi yoksa o konuda yorum yapma.
 
 Ekip listesi:
-${aktifKisiler.map(k => `- ${k.isim} | Ekip: ${k.ekip} | Projeler: ${k.projeler}`).join("\n")}
+${aktifKisiler.map(k => `- ${k.isim}${k.ekip ? ` | Birim: ${k.ekip}` : ""}${k.projeler ? ` | Projeler: ${k.projeler}` : ""}`).join("\n")}
 
 Sadece şu JSON formatında yanıt ver, başka hiçbir şey yazma:
 {
@@ -33,7 +34,7 @@ Sadece şu JSON formatında yanıt ver, başka hiçbir şey yazma:
         Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "http://localhost:5173",
-        "X-Title": "Ekip Dagitim",
+        "X-Title": "MEVAT-T",
       },
     }
   );

@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { gruplarOlustur } from "./groq";
+import { supabase } from "./supabase";
 import "./index.css";
 
 const RENKLER = ["#91b900", "#4b96d2", "#e40045", "#ffcd00", "#afafaf", "#303c49", "#91b900", "#4b96d2"];
-
 const bos_kisi = { isim: "", ekip: "", projeler: "", izinli: false, foto: null };
 const bos_gorev = { baslik: "", aciklama: "" };
 
@@ -42,43 +42,84 @@ function resimSikistir(file, cb) {
   reader.readAsDataURL(file);
 }
 
-export default function App() {
+function alfabetikSirala(arr) {
+  return [...arr].sort((a, b) => a.isim.localeCompare(b.isim, "tr"));
+}
+
+export default function App({ kullanici }) {
   const [sekme, setSekme] = useState("liste");
-  const [kisiler, setKisiler] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("kisiler")) || []; } catch { return []; }
-  });
+  const [kisiler, setKisiler] = useState([]);
   const [yeniKisi, setYeniKisi] = useState({ ...bos_kisi });
   const [grupSayisi, setGrupSayisi] = useState(4);
   const [gruplar, setGruplar] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(false);
+  const [kayitYukleniyor, setKayitYukleniyor] = useState(true);
   const [hata, setHata] = useState("");
-  const [gorevler, setGorevler] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("gorevler")) || []; } catch { return []; }
-  });
+  const [gorevler, setGorevler] = useState([]);
   const [yeniGorev, setYeniGorev] = useState({ ...bos_gorev });
-  const [gecmis, setGecmis] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("gecmis")) || []; } catch { return []; }
-  });
+  const [gecmis, setGecmis] = useState([]);
   const [seciliGecmis, setSeciliGecmis] = useState(null);
   const [duzenleId, setDuzenleId] = useState(null);
   const [duzenleData, setDuzenleData] = useState({});
+  const [gorevDuzenleId, setGorevDuzenleId] = useState(null);
+  const [gorevDuzenleData, setGorevDuzenleData] = useState({});
 
-  useEffect(() => { localStorage.setItem("kisiler", JSON.stringify(kisiler)); }, [kisiler]);
-  useEffect(() => { localStorage.setItem("gorevler", JSON.stringify(gorevler)); }, [gorevler]);
-  useEffect(() => { localStorage.setItem("gecmis", JSON.stringify(gecmis)); }, [gecmis]);
+  // Supabase'den yükle
+  useEffect(() => {
+    async function yukle() {
+      setKayitYukleniyor(true);
+      const { data } = await supabase
+        .from("veriler")
+        .select("*")
+        .eq("kullanici_email", kullanici.email)
+        .single();
+      if (data) {
+        setKisiler(alfabetikSirala(data.kisiler || []));
+        setGorevler(data.gorevler || []);
+      }
+      // Geçmişi localStorage'dan al (cihaza özel)
+      try { setGecmis(JSON.parse(localStorage.getItem("gecmis")) || []); } catch { setGecmis([]); }
+      setKayitYukleniyor(false);
+    }
+    yukle();
+  }, [kullanici.email]);
+
+  // Supabase'e kaydet
+  async function kaydet(yeniKisiler, yeniGorevler) {
+    await supabase.from("veriler").upsert({
+      id: kullanici.email,
+      kullanici_email: kullanici.email,
+      kisiler: yeniKisiler,
+      gorevler: yeniGorevler,
+      guncelleme: new Date().toISOString(),
+    });
+  }
 
   function kisiEkle() {
     if (!yeniKisi.isim.trim()) return;
-    setKisiler([...kisiler, { ...yeniKisi, id: Date.now() }]);
+    const yeni = alfabetikSirala([...kisiler, { ...yeniKisi, id: Date.now() }]);
+    setKisiler(yeni);
+    kaydet(yeni, gorevler);
     setYeniKisi({ ...bos_kisi });
   }
 
-  function kisiSil(id) { setKisiler(kisiler.filter(k => k.id !== id)); }
-  function izinToggle(id) { setKisiler(kisiler.map(k => k.id === id ? { ...k, izinli: !k.izinli } : k)); }
+  function kisiSil(id) {
+    const yeni = kisiler.filter(k => k.id !== id);
+    setKisiler(yeni);
+    kaydet(yeni, gorevler);
+  }
+
+  function izinToggle(id) {
+    const yeni = kisiler.map(k => k.id === id ? { ...k, izinli: !k.izinli } : k);
+    setKisiler(yeni);
+    kaydet(yeni, gorevler);
+  }
 
   function fotoEkle(id, file) {
     resimSikistir(file, (base64) => {
-      setKisiler(kisiler.map(k => k.id === id ? { ...k, foto: base64 } : k));
+      const yeni = kisiler.map(k => k.id === id ? { ...k, foto: base64 } : k);
+      setKisiler(yeni);
+      kaydet(yeni, gorevler);
     });
   }
 
@@ -89,18 +130,34 @@ export default function App() {
   }
 
   function kisiKaydet() {
-    setKisiler(kisiler.map(k => k.id === duzenleId ? { ...k, ...duzenleData } : k));
+    const yeni = alfabetikSirala(kisiler.map(k => k.id === duzenleId ? { ...k, ...duzenleData } : k));
+    setKisiler(yeni);
+    kaydet(yeni, gorevler);
     setDuzenleId(null);
     setDuzenleData({});
   }
 
   function gorevEkle() {
     if (!yeniGorev.baslik.trim()) return;
-    setGorevler([...gorevler, { ...yeniGorev, id: Date.now() }]);
+    const yeni = [...gorevler, { ...yeniGorev, id: Date.now() }];
+    setGorevler(yeni);
+    kaydet(kisiler, yeni);
     setYeniGorev({ ...bos_gorev });
   }
 
-  function gorevSil(id) { setGorevler(gorevler.filter(g => g.id !== id)); }
+  function gorevSil(id) {
+    const yeni = gorevler.filter(g => g.id !== id);
+    setGorevler(yeni);
+    kaydet(kisiler, yeni);
+  }
+
+  function gorevKaydet() {
+    const yeni = gorevler.map(g => g.id === gorevDuzenleId ? { ...g, ...gorevDuzenleData } : g);
+    setGorevler(yeni);
+    kaydet(kisiler, yeni);
+    setGorevDuzenleId(null);
+    setGorevDuzenleData({});
+  }
 
   async function grupla() {
     if (kisiler.filter(k => !k.izinli).length < grupSayisi) {
@@ -124,7 +181,9 @@ export default function App() {
         gruplar: gruplarlaGorev,
         kisiler: [...kisiler],
       };
-      setGecmis(prev => [yeniKayit, ...prev.slice(0, 19)]);
+      const yeniGecmis = [yeniKayit, ...gecmis.slice(0, 19)];
+      setGecmis(yeniGecmis);
+      localStorage.setItem("gecmis", JSON.stringify(yeniGecmis));
       setSekme("sonuc");
     } catch (e) {
       setHata("Hata oluştu: " + e.message);
@@ -137,6 +196,14 @@ export default function App() {
   const gosterilecekGruplar = seciliGecmis ? seciliGecmis.gruplar : gruplar;
   const gosterilecekKisiler = seciliGecmis ? seciliGecmis.kisiler : kisiler;
 
+  if (kayitYukleniyor) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#1a1f24", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontFamily: "Arial, sans-serif", fontSize: "14px", color: "#91b900", letterSpacing: "3px" }}>YÜKLENİYOR...</div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: "#1a1f24", display: "flex", flexDirection: "column" }}>
 
@@ -144,12 +211,11 @@ export default function App() {
       <div style={{ background: "#222830", borderBottom: "3px solid #91b900", padding: "14px 24px", display: "flex", alignItems: "center", gap: "16px" }}>
         <ManLogo size={40} />
         <div>
-          <div style={{ fontFamily: "Arial, sans-serif", fontSize: "18px", fontWeight: "bold", color: "#afafaf", letterSpacing: "3px" }}>
-            MEVAT-T
-          </div>
-          <div style={{ fontFamily: "Arial, sans-serif", fontSize: "10px", color: "#555", letterSpacing: "1px" }}>
-            EKİP DAĞITIM SİSTEMİ
-          </div>
+          <div style={{ fontFamily: "Arial, sans-serif", fontSize: "18px", fontWeight: "bold", color: "#afafaf", letterSpacing: "3px" }}>MEVAT-T</div>
+          <div style={{ fontFamily: "Arial, sans-serif", fontSize: "10px", color: "#555", letterSpacing: "1px" }}>EKİP DAĞITIM SİSTEMİ</div>
+        </div>
+        <div style={{ marginLeft: "auto", fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#555" }}>
+          {kullanici.email}
         </div>
       </div>
 
@@ -157,26 +223,20 @@ export default function App() {
 
         {/* SOL PANEL */}
         <div style={{ width: "220px", background: "#1e2329", borderRight: "1px solid #303c49", padding: "16px 12px", flexShrink: 0 }}>
-          <div style={{ fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#91b900", marginBottom: "12px", letterSpacing: "2px", fontWeight: "bold" }}>
-            GECMIS
-          </div>
+          <div style={{ fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#91b900", marginBottom: "12px", letterSpacing: "2px", fontWeight: "bold" }}>GECMIS</div>
           {gecmis.length === 0 && (
             <div style={{ fontFamily: "Arial, sans-serif", fontSize: "10px", color: "#333", lineHeight: "1.6" }}>Henüz gruplama yapılmadı.</div>
           )}
           {gecmis.map((g, i) => (
             <div key={g.id} onClick={() => { setSeciliGecmis(g); setSekme("sonuc"); }}
-              style={{
-                background: seciliGecmis?.id === g.id ? "#2a3340" : "transparent",
-                border: `1px solid ${seciliGecmis?.id === g.id ? "#91b90044" : "#2a3340"}`,
-                borderRadius: "4px", padding: "8px 10px", marginBottom: "6px", cursor: "pointer",
-              }}>
+              style={{ background: seciliGecmis?.id === g.id ? "#2a3340" : "transparent", border: `1px solid ${seciliGecmis?.id === g.id ? "#91b90044" : "#2a3340"}`, borderRadius: "4px", padding: "8px 10px", marginBottom: "6px", cursor: "pointer" }}>
               <div style={{ fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#91b900", fontWeight: "bold" }}>#{gecmis.length - i} — {g.grupSayisi} grup</div>
               <div style={{ fontFamily: "Arial, sans-serif", fontSize: "10px", color: "#555", marginTop: "3px" }}>{g.aktifSayisi} kişi</div>
               <div style={{ fontFamily: "Arial, sans-serif", fontSize: "9px", color: "#444", marginTop: "2px" }}>{g.tarih}</div>
             </div>
           ))}
           {gecmis.length > 0 && (
-            <button onClick={() => { setGecmis([]); setSeciliGecmis(null); }}
+            <button onClick={() => { setGecmis([]); setSeciliGecmis(null); localStorage.removeItem("gecmis"); }}
               style={{ ...btnStyle("#e40045", "6px 10px"), width: "100%", marginTop: "8px", fontSize: "10px" }}>
               Gecmisi Temizle
             </button>
@@ -185,8 +245,6 @@ export default function App() {
 
         {/* SAG ICERIK */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-
-          {/* SEKMELER */}
           <div style={{ display: "flex", borderBottom: "2px solid #303c49", background: "#222830" }}>
             {[
               { key: "liste", label: "EKİP LİSTESİ" },
@@ -196,8 +254,7 @@ export default function App() {
             ].map(s => (
               <button key={s.key} onClick={() => { setSekme(s.key); setSeciliGecmis(null); }} style={{
                 flex: 1, padding: "14px", border: "none", cursor: "pointer",
-                fontFamily: "Arial, sans-serif", fontSize: "12px", fontWeight: "bold",
-                letterSpacing: "1px",
+                fontFamily: "Arial, sans-serif", fontSize: "12px", fontWeight: "bold", letterSpacing: "1px",
                 background: sekme === s.key ? "#1a1f24" : "#222830",
                 color: sekme === s.key ? "#91b900" : "#555",
                 borderBottom: sekme === s.key ? "2px solid #91b900" : "2px solid transparent",
@@ -224,13 +281,12 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* YENİ KİŞİ FORMU */}
                 <div style={{ background: "#222830", border: "1px solid #303c49", borderRadius: "4px", padding: "16px", marginBottom: "20px" }}>
                   <div style={{ fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#91b900", marginBottom: "12px", letterSpacing: "2px", fontWeight: "bold" }}>YENİ KİŞİ EKLE</div>
                   <div style={{ display: "flex", gap: "16px", marginBottom: "12px", alignItems: "center" }}>
                     <div onClick={() => document.getElementById("yeni-foto").click()}
                       style={{ width: "64px", height: "64px", borderRadius: "4px", border: "2px dashed #303c49", cursor: "pointer", overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#1a1f24" }}>
-                      {yeniKisi.foto ? <img src={yeniKisi.foto} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "24px" }}>+</span>}
+                      {yeniKisi.foto ? <img src={yeniKisi.foto} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "24px", color: "#555" }}>+</span>}
                     </div>
                     <input id="yeni-foto" type="file" accept="image/*" style={{ display: "none" }}
                       onChange={e => e.target.files[0] && yeniFotoEkle(e.target.files[0])} />
@@ -258,11 +314,10 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* KİŞİ LİSTESİ */}
                 {kisiler.length === 0 && (
                   <div style={{ textAlign: "center", color: "#333", fontFamily: "Arial, sans-serif", padding: "40px" }}>Henüz kimse yok. Ekip üyesi ekle!</div>
                 )}
-                {kisiler.map((k, i) => (
+                {kisiler.map((k) => (
                   <div key={k.id} style={{
                     background: "#222830",
                     border: `1px solid ${duzenleId === k.id ? "#91b90044" : k.izinli ? "#e4004533" : "#303c49"}`,
@@ -275,7 +330,7 @@ export default function App() {
                         <div style={{ display: "flex", gap: "16px", marginBottom: "10px", alignItems: "center" }}>
                           <div onClick={() => document.getElementById(`duzenle-foto-${k.id}`).click()}
                             style={{ width: "48px", height: "48px", borderRadius: "4px", border: "2px dashed #91b900", cursor: "pointer", overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#1a1f24" }}>
-                            {duzenleData.foto ? <img src={duzenleData.foto} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "20px" }}>+</span>}
+                            {duzenleData.foto ? <img src={duzenleData.foto} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "20px", color: "#555" }}>+</span>}
                           </div>
                           <input id={`duzenle-foto-${k.id}`} type="file" accept="image/*" style={{ display: "none" }}
                             onChange={e => e.target.files[0] && resimSikistir(e.target.files[0], (b) => setDuzenleData({ ...duzenleData, foto: b }))} />
@@ -349,12 +404,30 @@ export default function App() {
                   <div style={{ textAlign: "center", color: "#333", fontFamily: "Arial, sans-serif", padding: "40px" }}>Henüz görev yok.</div>
                 )}
                 {gorevler.map((g, i) => (
-                  <div key={g.id} style={{ background: "#222830", border: `1px solid #303c49`, borderLeft: `3px solid ${RENKLER[i % RENKLER.length]}`, borderRadius: "4px", padding: "12px 16px", display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontFamily: "Arial, sans-serif", fontSize: "13px", fontWeight: "bold", color: "#e0e0e0" }}>{g.baslik}</div>
-                      {g.aciklama && <div style={{ fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#555", marginTop: "4px" }}>{g.aciklama}</div>}
-                    </div>
-                    <button onClick={() => gorevSil(g.id)} style={btnStyle("#e40045", "8px 10px")}>SİL</button>
+                  <div key={g.id} style={{ background: "#222830", border: `1px solid #303c49`, borderLeft: `3px solid ${RENKLER[i % RENKLER.length]}`, borderRadius: "4px", padding: "12px 16px", marginBottom: "8px" }}>
+                    {gorevDuzenleId === g.id ? (
+                      <div>
+                        <input value={gorevDuzenleData.baslik || ""} placeholder="Görev başlığı"
+                          onChange={e => setGorevDuzenleData({ ...gorevDuzenleData, baslik: e.target.value })}
+                          style={{ ...inputStyle, width: "100%", marginBottom: "8px" }} />
+                        <input value={gorevDuzenleData.aciklama || ""} placeholder="Açıklama"
+                          onChange={e => setGorevDuzenleData({ ...gorevDuzenleData, aciklama: e.target.value })}
+                          style={{ ...inputStyle, width: "100%", marginBottom: "8px" }} />
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button onClick={gorevKaydet} style={btnStyle("#91b900", "8px 14px")}>KAYDET</button>
+                          <button onClick={() => { setGorevDuzenleId(null); setGorevDuzenleData({}); }} style={btnStyle("#555", "8px 14px")}>İPTAL</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontFamily: "Arial, sans-serif", fontSize: "13px", fontWeight: "bold", color: "#e0e0e0" }}>{g.baslik}</div>
+                          {g.aciklama && <div style={{ fontFamily: "Arial, sans-serif", fontSize: "11px", color: "#555", marginTop: "4px" }}>{g.aciklama}</div>}
+                        </div>
+                        <button onClick={() => { setGorevDuzenleId(g.id); setGorevDuzenleData({ ...g }); }} style={btnStyle("#ffcd00", "8px 10px")}>DUZENLE</button>
+                        <button onClick={() => gorevSil(g.id)} style={btnStyle("#e40045", "8px 10px")}>SİL</button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -363,9 +436,7 @@ export default function App() {
             {/* DAĞITIM */}
             {sekme === "dagit" && (
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontFamily: "Arial, sans-serif", fontSize: "16px", fontWeight: "bold", color: "#afafaf", marginBottom: "32px", letterSpacing: "4px" }}>
-                  AI GRUPLAMA
-                </div>
+                <div style={{ fontFamily: "Arial, sans-serif", fontSize: "16px", fontWeight: "bold", color: "#afafaf", marginBottom: "32px", letterSpacing: "4px" }}>AI GRUPLAMA</div>
                 <div style={{ background: "#222830", border: "1px solid #303c49", borderRadius: "4px", padding: "32px", marginBottom: "24px" }}>
                   <div style={{ fontFamily: "Arial, sans-serif", fontSize: "13px", color: "#afafaf", marginBottom: "8px" }}>
                     Aktif: <span style={{ color: "#91b900" }}>{aktifSayisi}</span> &nbsp;|&nbsp;
