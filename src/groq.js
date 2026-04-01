@@ -7,9 +7,12 @@ export async function gruplarOlustur(kisiler, grupSayisi) {
 
   const prompt = `
 Sen bir ekip yöneticisisin. Aşağıdaki kişileri ${grupSayisi} gruba böl.
-Ekip dengesini ve uzmanlıkları göz önünde bulundur.
-Aynı birimden çok kişi aynı gruba düşmesin.
-Gruplama gerekçesi yazarken sadece gerçek bilgilere dayan, unvan veya proje bilgisi yoksa o konuda yorum yapma.
+Kurallar:
+- Aynı birimden kişiler mümkün olduğunca farklı gruplara dağıtılsın
+- Gruplar eşit sayıda olsun
+- Gerekçe yazarken SADECE aşağıdaki listede verilen bilgileri kullan
+- Listede birim bilgisi varsa birime göre, yoksa sadece dengeli dağıtıldığını yaz
+- Kesinlikle "unvan", "uzmanlık", "cinsiyet", "proje deneyimi" gibi listede olmayan bilgilere atıfta bulunma
 
 Ekip listesi:
 ${aktifKisiler.map(k => `- ${k.isim}${k.ekip ? ` | Birim: ${k.ekip}` : ""}${k.projeler ? ` | Projeler: ${k.projeler}` : ""}`).join("\n")}
