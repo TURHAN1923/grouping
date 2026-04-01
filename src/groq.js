@@ -7,23 +7,23 @@ export async function gruplarOlustur(kisiler, grupSayisi) {
     .filter(k => !k.izinli)
     .sort(() => Math.random() - 0.5);
 
-  const prompt = `Aşağıdaki ${aktifKisiler.length} kişiyi ${grupSayisi} gruba böl. Aynı birimden kişiler farklı gruplara gitsin. Gruplar eşit sayıda olsun. Gerekçede sadece verilen bilgileri kullan, tahmin yürütme.
+  const prompt = `Aşağıdaki ${aktifKisiler.length} kişiyi ${grupSayisi} gruba böl. Aynı birimden kişiler farklı gruplara gitsin. Gruplar eşit sayıda olsun.
 
 Ekip:
-${aktifKisiler.map(k => `${k.isim}${k.ekip ? ` (${k.ekip})` : ""}`).join(", ")}
+${aktifKisiler.map(k => `${k.isim}${k.ekip ? ` (${k.ekip})` : ""}`).join("\n")}
 
-Yanıt SADECE JSON olsun:
-{"gruplar":[{"no":1,"uyeler":["isim1","isim2"],"gerekce":"kısa açıklama"}]}`;
+SADECE bu JSON formatında yanıt ver, başka hiçbir şey yazma:
+{"gruplar":[{"no":1,"uyeler":["isim1","isim2"],"gerekce":"açıklama"}]}`;
 
   const res = await axios.post(
     "https://api.groq.com/openai/v1/chat/completions",
     {
-      model: "openai/gpt-oss-120b",
+      model: "llama-3.3-70b-versatile",
       messages: [
-        { role: "system", content: "Sadece JSON formatında yanıt ver. Başka hiçbir şey yazma." },
+        { role: "system", content: "Sen bir JSON üreticisin. Sadece geçerli JSON döndür, başka hiçbir şey yazma." },
         { role: "user", content: prompt }
       ],
-      temperature: 0.5,
+      temperature: 0.3,
       max_tokens: 4000,
     },
     {
